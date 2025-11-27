@@ -81,8 +81,12 @@ function arcModel() {
           [ -z "$(grep -w "${M}" "${S_FILE}")" ] && COMPATIBLE=0
           [ -z "$(grep -w "${A}" "${P_FILE}")" ] && COMPATIBLE=0
           if [ "${CPUCNT:-0}" -gt "${PLTCNT:-0}" ]; then
-            COMPATIBLE=0
-            echo -e "${WARN}- CPU count (${CPUCNT}) exceeds platform count (${PLTCNT})\n" >>"${TMP_PATH}/${M}_warn"
+            if [ "${M}" = "SA6400" ]; then
+              PLTCNT="128"
+            else
+              COMPATIBLE=0
+              echo -e "${WARN}- CPU count (${CPUCNT}) exceeds platform count (${PLTCNT})\n" >>"${TMP_PATH}/${M}_warn"
+            fi
           fi
           if [ "${M}" != "SA6400" ] && [ "${MEV}" = "hyperv" ]; then
             COMPATIBLE=0
@@ -157,6 +161,12 @@ function arcModel() {
     writeConfigKey "smallnum" "" "${USER_CONFIG_FILE}"
     writeConfigKey "sn" "" "${USER_CONFIG_FILE}"
     writeConfigKey "zimage-hash" "" "${USER_CONFIG_FILE}"
+    PLTCNT="$(readConfigKey "platforms.${A}.ccnt" "${P_FILE}")"
+    if [ "${MODEL}" = "SA6400" ]; then
+      if [ "${CPUCNT:-0}" -gt "${PLTCNT:-0}" ] || [ "${MEV}" = "hyperv" ]; then
+        writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
+      fi
+    fi
     rm -f "${ORI_ZIMAGE_FILE}" "${ORI_RDGZ_FILE}" "${MOD_ZIMAGE_FILE}" "${MOD_RDGZ_FILE}" >/dev/null 2>&1 || true
   fi
   resetBuildstatus
