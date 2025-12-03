@@ -185,72 +185,19 @@ function arcModel() {
 ###############################################################################
 # Arc Version Section
 function arcVersion() {
-  init_default_addons() {
-    initConfigKey "addons.acpid" "" "${USER_CONFIG_FILE}"
-    initConfigKey "addons.arcdns" "" "${USER_CONFIG_FILE}"
-    initConfigKey "addons.cpuinfo" "" "${USER_CONFIG_FILE}"
-    initConfigKey "addons.hdddb" "" "${USER_CONFIG_FILE}"
-    initConfigKey "addons.mountloader" "" "${USER_CONFIG_FILE}"
-    initConfigKey "addons.reducelogs" "" "${USER_CONFIG_FILE}"
-    initConfigKey "addons.storagepanel" "" "${USER_CONFIG_FILE}"
-    initConfigKey "addons.updatenotify" "" "${USER_CONFIG_FILE}"
-    if [[ "${NVMEDRIVES}" -gt 0 && "${BUS}" != "nvme" ]] || [[ "${NVMEDRIVES}" -gt 1 && "${BUS}" = "nvme" ]]; then
-      if is_in_array "${PLATFORM}" "${KVER5L[@]}" && [ "${SATADRIVES}" -eq 0 ] && [ "${SASDRIVES}" -eq 0 ] && [ "${BUS}" != "sata" ]; then
-        initConfigKey "addons.nvmesystem" "" "${USER_CONFIG_FILE}"
-      elif is_in_array "${PLATFORM}" "${KVER5L[@]}" && [ "${SATADRIVES}" -le 1 ] && [ "${SASDRIVES}" -eq 0 ] && [ "${BUS}" = "sata" ]; then
-        initConfigKey "addons.nvmesystem" "" "${USER_CONFIG_FILE}"
-      elif [ "${DT}" = "true" ]; then
-        initConfigKey "addons.nvmevolume" "" "${USER_CONFIG_FILE}"
-      elif is_in_array "${MODEL}" "${NVMECACHE[@]}"; then
-        initConfigKey "addons.nvmecache" "" "${USER_CONFIG_FILE}"
-      fi
-    fi
-    if [ "${MEV}" = "physical" ]; then
-      initConfigKey "addons.cpufreqscaling" "" "${USER_CONFIG_FILE}"
-      initConfigKey "addons.powersched" "" "${USER_CONFIG_FILE}"
-      initConfigKey "addons.sensors" "" "${USER_CONFIG_FILE}"
-      CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | head -1 | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
-      if [ -n "${CORETEMP}" ]; then
-        initConfigKey "addons.fancontrol" "" "${USER_CONFIG_FILE}"
-      fi
-      if is_in_array "${PLATFORM}" "${KVER5L[@]}"; then
-        if command -v dmidecode >/dev/null 2>&1; then
-            UGREEN_CHECK=$(dmidecode --string system-product-name 2>/dev/null)
-            case "${UGREEN_CHECK}" in
-              DXP6800*|DX4600*|DX4700*|DXP2800*|DXP4800*|DXP8800*)
-                initConfigKey "addons.ledcontrol" "" "${USER_CONFIG_FILE}"
-                ;;
-            esac
-        fi
-      fi
-    else
-      initConfigKey "addons.vmtools" "" "${USER_CONFIG_FILE}"
-    fi
-    #IGPUID="$(lspci -nd ::300 2>/dev/null | grep "8086" | cut -d' ' -f3 | sed 's/://g')"
-    #if is_in_array "${PLATFORM}" "${IGPU1L[@]}" && grep -iq "${IGPUID}" "${ARC_PATH}/include/i915ids"; then
-    #  initConfigKey "addons.i915" "" "${USER_CONFIG_FILE}"
-    #fi
-    if [ "${EXTERNALCONTROLLER}" = "true" ]; then
-      initConfigKey "addons.smartctl" "" "${USER_CONFIG_FILE}"
-    fi
-    WEBHOOKNOTIFY="$(readConfigKey "arc.webhooknotify" "${USER_CONFIG_FILE}")"
-    DISCORDNOTIFY="$(readConfigKey "arc.discordnotify" "${USER_CONFIG_FILE}")"
-    if [ "${WEBHOOKNOTIFY}" = "true" ] || [ "${DISCORDNOTIFY}" = "true" ]; then
-      initConfigKey "addons.notification" "" "${USER_CONFIG_FILE}"
-    fi
-  }
-
   MODEL="$(readConfigKey "model" "${USER_CONFIG_FILE}")"
   PLATFORM="$(readConfigKey "platform" "${USER_CONFIG_FILE}")"
   DT="$(readConfigKey "platforms.${PLATFORM}.dt" "${P_FILE}")"
   PRODUCTVER="$(readConfigKey "productver" "${USER_CONFIG_FILE}")"
   PAT_URL="$(readConfigKey "paturl" "${USER_CONFIG_FILE}")"
   PAT_HASH="$(readConfigKey "pathash" "${USER_CONFIG_FILE}")"
+  # Read Arc Mode to prevent issues
+  arc_mode
   if [ "${ARC_MODE}" = "config" ] && [ "${ARCRESTORE}" != "true" ]; then
     CVS="$(readConfigEntriesArray "platforms.${PLATFORM}.productvers" "${P_FILE}")"
     PVS="$(readConfigEntriesArray "${PLATFORM}.\"${MODEL}\"" "${D_FILE}")"
     LVS=""
-        for V in $(echo "${PVS}" | sort -r); do
+      for V in $(echo "${PVS}" | sort -r); do
       BASE_BUILD="${V%-*}"
       if ! [[ " ${UNIQUE_BUILDS[*]} " =~ " ${BASE_BUILD} " ]]; then
         if echo "${CVS}" | grep -qx "${V:0:3}"; then
@@ -289,10 +236,6 @@ function arcVersion() {
     fi
   fi
 
-  if [ -n "${PAT_URL}" ] || [ -n "${PAT_HASH}" ]; then
-    VALID="true"
-  fi
-
   if [ "${ONLYVERSION}" != "true" ] && [ "${ARC_MODE}" = "config" ]; then
     USERID="$(readConfigKey "arc.userid" "${USER_CONFIG_FILE}")"
     ADDONS_LIST="$(readConfigMap "addons" "${USER_CONFIG_FILE}")"
@@ -308,48 +251,39 @@ function arcVersion() {
     ARC_MODE=$([ $? -eq 0 ] && echo "automated" || echo "config")
   fi
 
-  if [ "${VALID}" = "true" ]; then
-    dialog --backtitle "$(backtitle)" --title "Arc Config" \
-      --infobox "Reconfiguring Cmdline, Modules and Synoinfo" 3 60
-    writeConfigKey "synoinfo" "{}" "${USER_CONFIG_FILE}"
+  dialog --backtitle "$(backtitle)" --title "Arc Config" \
+    --infobox "Reconfiguring Cmdline, Modules and Synoinfo" 3 60
+  writeConfigKey "synoinfo" "{}" "${USER_CONFIG_FILE}"
 
-    while IFS=': ' read -r KEY VALUE; do
-      writeConfigKey "synoinfo.\"${KEY}\"" "${VALUE}" "${USER_CONFIG_FILE}"
-    done < <(readConfigMap "platforms.${PLATFORM}.synoinfo" "${P_FILE}")
+  while IFS=': ' read -r KEY VALUE; do
+    writeConfigKey "synoinfo.\"${KEY}\"" "${VALUE}" "${USER_CONFIG_FILE}"
+  done < <(readConfigMap "platforms.${PLATFORM}.synoinfo" "${P_FILE}")
 
-    KVER="$(readConfigKey "platforms.${PLATFORM}.productvers.\"${PRODUCTVER}\".kver" "${P_FILE}")"
-    is_in_array "${PLATFORM}" "${KVER5L[@]}" && KVERP="${PRODUCTVER}-${KVER}" || KVERP="${KVER}"
-    if [ -n "${PLATFORM}" ] && [ -n "${KVERP}" ]; then
-      writeConfigKey "modules" "{}" "${USER_CONFIG_FILE}"
-      mergeConfigModules "$(getAllModules "${PLATFORM}" "${KVERP}" | awk '{print $1}')" "${USER_CONFIG_FILE}"
+  KVER="$(readConfigKey "platforms.${PLATFORM}.productvers.\"${PRODUCTVER}\".kver" "${P_FILE}")"
+  is_in_array "${PLATFORM}" "${KVER5L[@]}" && KVERP="${PRODUCTVER}-${KVER}" || KVERP="${KVER}"
+  if [ -n "${PLATFORM}" ] && [ -n "${KVERP}" ]; then
+    writeConfigKey "modules" "{}" "${USER_CONFIG_FILE}"
+    mergeConfigModules "$(getAllModules "${PLATFORM}" "${KVERP}" | awk '{print $1}')" "${USER_CONFIG_FILE}"
+  fi
+
+  ADDONS="$(readConfigKey "addons" "${USER_CONFIG_FILE}")"
+  if [ "${ADDONS}" = "{}" ]; then
+    init_default_addons
+  fi
+
+  while IFS=': ' read -r ADDON PARAM; do
+    [ -z "${ADDON}" ] && continue
+    if ! isAddonAvailable "${ADDON}" "${PLATFORM}"; then
+      deleteConfigKey "addons.\"${ADDON}\"" "${USER_CONFIG_FILE}"
     fi
+  done < <(readConfigMap "addons" "${USER_CONFIG_FILE}")
 
-    ADDONS="$(readConfigKey "addons" "${USER_CONFIG_FILE}")"
-    if [ "${ADDONS}" = "{}" ]; then
-      init_default_addons
-    fi
-
-    while IFS=': ' read -r ADDON PARAM; do
-      [ -z "${ADDON}" ] && continue
-      if ! isAddonAvailable "${ADDON}" "${PLATFORM}"; then
-        deleteConfigKey "addons.\"${ADDON}\"" "${USER_CONFIG_FILE}"
-      fi
-    done < <(readConfigMap "addons" "${USER_CONFIG_FILE}")
-
-    if [ "${ONLYVERSION}" = "true" ]; then
-      resetBuild
-      ONLYVERSION="false"
-      return
-    else
-      arcPatch
-    fi
-  else
-    dialog --backtitle "$(backtitle)" --title "Arc Config" --aspect 18 \
-      --infobox "Arc Config failed!\nExit." 4 40
-    writeConfigKey "arc.confdone" "false" "${USER_CONFIG_FILE}"
-    CONFDONE="$(readConfigKey "arc.confdone" "${USER_CONFIG_FILE}")"
-    sleep 5
+  if [ "${ONLYVERSION}" = "true" ]; then
+    resetBuild
+    ONLYVERSION="false"
     return
+  else
+    arcPatch
   fi
   return
 }
@@ -574,6 +508,63 @@ function makearc() {
     return
   fi
   return
+}
+
+###############################################################################
+# Default Addons
+function init_default_addons() {
+  initConfigKey "addons.acpid" "" "${USER_CONFIG_FILE}"
+  initConfigKey "addons.arcdns" "" "${USER_CONFIG_FILE}"
+  initConfigKey "addons.cpuinfo" "" "${USER_CONFIG_FILE}"
+  initConfigKey "addons.hdddb" "" "${USER_CONFIG_FILE}"
+  initConfigKey "addons.mountloader" "" "${USER_CONFIG_FILE}"
+  initConfigKey "addons.reducelogs" "" "${USER_CONFIG_FILE}"
+  initConfigKey "addons.storagepanel" "" "${USER_CONFIG_FILE}"
+  initConfigKey "addons.updatenotify" "" "${USER_CONFIG_FILE}"
+  if [[ "${NVMEDRIVES}" -gt 0 && "${BUS}" != "nvme" ]] || [[ "${NVMEDRIVES}" -gt 1 && "${BUS}" = "nvme" ]]; then
+    if is_in_array "${PLATFORM}" "${KVER5L[@]}" && [ "${SATADRIVES}" -eq 0 ] && [ "${SASDRIVES}" -eq 0 ] && [ "${BUS}" != "sata" ]; then
+      initConfigKey "addons.nvmesystem" "" "${USER_CONFIG_FILE}"
+    elif is_in_array "${PLATFORM}" "${KVER5L[@]}" && [ "${SATADRIVES}" -le 1 ] && [ "${SASDRIVES}" -eq 0 ] && [ "${BUS}" = "sata" ]; then
+      initConfigKey "addons.nvmesystem" "" "${USER_CONFIG_FILE}"
+    elif [ "${DT}" = "true" ]; then
+      initConfigKey "addons.nvmevolume" "" "${USER_CONFIG_FILE}"
+    elif is_in_array "${MODEL}" "${NVMECACHE[@]}"; then
+      initConfigKey "addons.nvmecache" "" "${USER_CONFIG_FILE}"
+    fi
+  fi
+  if [ "${MEV}" = "physical" ]; then
+    initConfigKey "addons.cpufreqscaling" "" "${USER_CONFIG_FILE}"
+    initConfigKey "addons.powersched" "" "${USER_CONFIG_FILE}"
+    initConfigKey "addons.sensors" "" "${USER_CONFIG_FILE}"
+    CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | head -1 | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
+    if [ -n "${CORETEMP}" ]; then
+      initConfigKey "addons.fancontrol" "" "${USER_CONFIG_FILE}"
+    fi
+    if is_in_array "${PLATFORM}" "${KVER5L[@]}"; then
+      if command -v dmidecode >/dev/null 2>&1; then
+          UGREEN_CHECK=$(dmidecode --string system-product-name 2>/dev/null)
+          case "${UGREEN_CHECK}" in
+            DXP6800*|DX4600*|DX4700*|DXP2800*|DXP4800*|DXP8800*)
+              initConfigKey "addons.ledcontrol" "" "${USER_CONFIG_FILE}"
+              ;;
+          esac
+      fi
+    fi
+  else
+    initConfigKey "addons.vmtools" "" "${USER_CONFIG_FILE}"
+  fi
+  #IGPUID="$(lspci -nd ::300 2>/dev/null | grep "8086" | cut -d' ' -f3 | sed 's/://g')"
+  #if is_in_array "${PLATFORM}" "${IGPU1L[@]}" && grep -iq "${IGPUID}" "${ARC_PATH}/include/i915ids"; then
+  #  initConfigKey "addons.i915" "" "${USER_CONFIG_FILE}"
+  #fi
+  if [ "${EXTERNALCONTROLLER}" = "true" ]; then
+    initConfigKey "addons.smartctl" "" "${USER_CONFIG_FILE}"
+  fi
+  WEBHOOKNOTIFY="$(readConfigKey "arc.webhooknotify" "${USER_CONFIG_FILE}")"
+  DISCORDNOTIFY="$(readConfigKey "arc.discordnotify" "${USER_CONFIG_FILE}")"
+  if [ "${WEBHOOKNOTIFY}" = "true" ] || [ "${DISCORDNOTIFY}" = "true" ]; then
+    initConfigKey "addons.notification" "" "${USER_CONFIG_FILE}"
+  fi
 }
 
 ###############################################################################
