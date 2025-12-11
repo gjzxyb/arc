@@ -597,7 +597,8 @@ function bootcheck() {
     dialog --backtitle "$(backtitle)" --title "Arc Boot" \
       --infobox "Booting DSM...\nPlease stay patient!" 4 25
     sleep 2
-    exec reboot
+    clear
+    exec boot.sh
   fi
   return
 }
