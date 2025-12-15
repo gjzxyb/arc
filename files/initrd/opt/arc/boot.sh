@@ -94,7 +94,7 @@ if [ "${DSMINFO}" = "true" ]; then
   echo -e "Model: \033[1;37m${MODEL} (${SYS_MODEL})\033[0m"
   echo -e "Platform: \033[1;37m${PLATFORM}\033[0m"
   echo -e "Version: \033[1;37m${PRODUCTVER} (${BUILDNUM}$([ ${SMALLNUM:-0} -ne 0 ] && echo "u${SMALLNUM}"))\033[0m"
-  echo -e "Kernel: \033[1;37m${KVER} (${KERNEL})\033[0m"
+  echo -e "Kernel: \033[1;37m${KERNEL} (${KVER})\033[0m"
   echo
 fi
 if [ "${SYSTEMINFO}" = "true" ]; then

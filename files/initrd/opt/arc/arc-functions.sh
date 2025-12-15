@@ -254,11 +254,29 @@ function arcVersion() {
     writeConfigKey "synoinfo.\"${KEY}\"" "${VALUE}" "${USER_CONFIG_FILE}"
   done < <(readConfigMap "platforms.${PLATFORM}.synoinfo" "${P_FILE}")
 
-  KVER="$(readConfigKey "platforms.${PLATFORM}.productvers.\"${PRODUCTVER}\".kver" "${P_FILE}")"
-  is_in_array "${PLATFORM}" "${KVER5L[@]}" && KVERP="${PRODUCTVER}-${KVER}" || KVERP="${KVER}"
-  if [ -n "${PLATFORM}" ] && [ -n "${KVERP}" ]; then
-    writeConfigKey "modules" "{}" "${USER_CONFIG_FILE}"
-    mergeConfigModules "$(getAllModules "${PLATFORM}" "${KVERP}" | awk '{print $1}')" "${USER_CONFIG_FILE}"
+  if [ "${MODEL}" = "SA6400" ]; then
+    if [ "${CPUCHT:-0}" -gt "${PLTCNT:-0}" ]; then
+      writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
+    elif [ "${MEV}" = "hyperv" ]; then
+      writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
+    elif [ "${PRODUCTVER}" = "7.3" ]; then
+      writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
+    else
+      writeConfigKey "kernel" "official" "${USER_CONFIG_FILE}"
+    fi
+  else
+    writeConfigKey "kernel" "official" "${USER_CONFIG_FILE}"
+  fi
+  KERNEL="$(readConfigKey "kernel" "${USER_CONFIG_FILE}")"
+  if [ "${KERNEL}" = "custom" ]; then
+    customKernel
+  else
+    KVER="$(readConfigKey "platforms.${PLATFORM}.productvers.\"${PRODUCTVER}\".kver" "${P_FILE}")"
+    is_in_array "${PLATFORM}" "${KVER5L[@]}" && KVERP="${PRODUCTVER}-${KVER}" || KVERP="${KVER}"
+    if [ -n "${PLATFORM}" ] && [ -n "${KVERP}" ]; then
+      writeConfigKey "modules" "{}" "${USER_CONFIG_FILE}"
+      mergeConfigModules "$(getAllModules "${PLATFORM}" "${KVERP}" | awk '{print $1}')" "${USER_CONFIG_FILE}"
+    fi
   fi
 
   ADDONS="$(readConfigKey "addons" "${USER_CONFIG_FILE}")"
@@ -3879,5 +3897,24 @@ function cleanDSMRoot() {
   else
     dialog --backtitle "$(backtitle)" --title "Clean Cache" \
     --infobox "Cleanup completed successfully." 0 0
+  fi
+}
+
+###############################################################################
+# Custom Kernel
+function customKernel() {
+  dialog --backtitle "$(backtitle)" --title "Kernel" \
+    --infobox "Switching Kernel to ${KERNEL}! Stay patient..." 3 50
+  if [ "${ODP}" = "true" ]; then
+    ODP="false"
+    writeConfigKey "odp" "${ODP}" "${USER_CONFIG_FILE}"
+  fi
+  PLATFORM="$(readConfigKey "platform" "${USER_CONFIG_FILE}")"
+  PRODUCTVER="$(readConfigKey "productver" "${USER_CONFIG_FILE}")"
+  KVER="$(readConfigKey "platforms.${PLATFORM}.productvers.\"${PRODUCTVER}\".kver" "${P_FILE}")"
+  is_in_array "${PLATFORM}" "${KVER5L[@]}" && KVERP="${PRODUCTVER}-${KVER}" || KVERP="${KVER}"
+  if [ -n "${PLATFORM}" ] && [ -n "${KVERP}" ]; then
+    writeConfigKey "modules" "{}" "${USER_CONFIG_FILE}"
+    mergeConfigModules "$(getAllModules "${PLATFORM}" "${KVERP}" | awk '{print $1}')" "${USER_CONFIG_FILE}"
   fi
 }
