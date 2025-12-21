@@ -3881,7 +3881,7 @@ function recoverDSM() {
       fi
     fi
     dialog --backtitle "$(backtitle)" --title "Restore Arc" \
-    --aspect 18 --infobox "Restore successful! -> Reload Arc Init now" 3 50
+      --aspect 18 --infobox "Restore successful! -> Reload Arc Init now" 3 50
     sleep 2
     rm -f "${HOME}/.initialized" && exec init.sh
   fi
