@@ -161,9 +161,9 @@ done
 CMDLINE['netif_num']="${ETHN}"
 
 for N in ${ETHX}; do
-  MAC="$(cat "/sys/class/net/${N}/address" 2>/dev/null)" || MAC="00:00:00:00:00:00"
-  BUS="$(ethtool -i "${N}" 2>/dev/null | grep "bus-info" | cut -d' ' -f2)" || BUS="0000:00:00.0"
-  if [ ! "${MAC}" = "00:00:00:00:00:00" ] && [ ! "${BUS}" = "0000:00:00.0" ]; then
+  MAC="$(cat "/sys/class/net/${N}/address" 2>/dev/null || echo "00:00:00:00:00:00")"
+  BUS="$(ethtool -i "${N}" 2>/dev/null | grep "bus-info" | cut -d' ' -f2 || echo "0000:00:00.0")"
+  if [ "${MAC}" != "00:00:00:00:00:00" ] && [ "${BUS}" != "0000:00:00.0" ]; then
     CMDLINE["R${BUS}"]="${MAC}"
   fi
 done

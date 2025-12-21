@@ -155,7 +155,7 @@ function arcModel() {
     writeConfigKey "emmcboot" "false" "${USER_CONFIG_FILE}"
     writeConfigKey "governor" "" "${USER_CONFIG_FILE}"
     writeConfigKey "hddsort" "false" "${USER_CONFIG_FILE}"
-    writeConfigKey "kernel" "official" "${USER_CONFIG_FILE}"
+    writeConfigKey "kernel" "\"official\"" "${USER_CONFIG_FILE}"
     writeConfigKey "odp" "false" "${USER_CONFIG_FILE}"
     writeConfigKey "model" "${MODEL}" "${USER_CONFIG_FILE}"
     writeConfigKey "paturl" "" "${USER_CONFIG_FILE}"
@@ -192,7 +192,7 @@ function arcVersion() {
   PAT_URL="$(readConfigKey "paturl" "${USER_CONFIG_FILE}")"
   PAT_HASH="$(readConfigKey "pathash" "${USER_CONFIG_FILE}")"
 
-  if [ "${ARC_MODE}" = "config" ] && [ "${ARCRESTORE}" != "true" ]; then
+  if [ "${ARC_MODE}" = "config" ]; then
     CVS="$(readConfigEntriesArray "platforms.${PLATFORM}.productvers" "${P_FILE}")"
     PVS="$(readConfigEntriesArray "${PLATFORM}.\"${MODEL}\"" "${D_FILE}")"
     LVS=""
@@ -270,25 +270,23 @@ function arcVersion() {
   fi
 
   dialog --backtitle "$(backtitle)" --title "Arc Config" \
-    --infobox "Reconfiguring Cmdline, Modules and Synoinfo" 3 60
-  writeConfigKey "synoinfo" "{}" "${USER_CONFIG_FILE}"
+    --infobox "Reconfiguring Addons, Modules and Synoinfo" 3 60
 
+  writeConfigKey "synoinfo" "{}" "${USER_CONFIG_FILE}"
   while IFS=': ' read -r KEY VALUE; do
     writeConfigKey "synoinfo.\"${KEY}\"" "${VALUE}" "${USER_CONFIG_FILE}"
   done < <(readConfigMap "platforms.${PLATFORM}.synoinfo" "${P_FILE}")
 
+  writeConfigKey "kernel" "official" "${USER_CONFIG_FILE}"
   if [ "${MODEL}" = "SA6400" ]; then
+    PLTCNT="$(readConfigKey "platforms.${PLATFORM}.ccnt" "${P_FILE}")"
     if [ "${CPUCHT:-0}" -gt "${PLTCNT:-0}" ]; then
       writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
     elif [ "${MEV}" = "hyperv" ]; then
       writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
     elif [ "${PRODUCTVER}" = "7.3" ]; then
       writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
-    else
-      writeConfigKey "kernel" "official" "${USER_CONFIG_FILE}"
     fi
-  else
-    writeConfigKey "kernel" "official" "${USER_CONFIG_FILE}"
   fi
   KERNEL="$(readConfigKey "kernel" "${USER_CONFIG_FILE}")"
   if [ "${KERNEL}" = "custom" ]; then
@@ -1744,7 +1742,7 @@ function sysinfo() {
   for N in ${ETHX}; do
     COUNT=0
     DRIVER="$(ls -ld /sys/class/net/${N}/device/driver 2>/dev/null | awk -F '/' '{print $NF}')"
-    MAC="$(cat /sys/class/net/${N}/address 2>/dev/null | sed 's/://g' | tr '[:upper:]' '[:lower:]')"
+    MAC="$(cat /sys/class/net/${N}/address 2>/dev/null | tr '[:upper:]' '[:lower:]')"
     while true; do
       if [ -z "$(cat /sys/class/net/${N}/carrier 2>/dev/null)" ]; then
         TEXT+="\n  ${DRIVER} (${MAC}): \ZbDOWN\Zn"
@@ -2629,8 +2627,7 @@ function formatDisks() {
       mdadm -S "${I}" >/dev/null 2>&1
     done
   fi
-  IFS=$'\n' read -r -d '' -a selected_disks <<< "$(echo "${resp}" | tr -d '"')"
-  for I in "${selected_disks[@]}"; do
+  for I in ${resp}; do
     umount -l "${I}" 2>/dev/null
     if [[ "${I}" = /dev/mmc* ]]; then
       echo y | mkfs.ext4 -T largefile4 -E nodiscard "${I}"
@@ -3852,6 +3849,8 @@ function recoverDSM() {
       TEXT+="\nSerial: ${SN}"
       ARC_PATCH="$(readConfigKey "arc.patch" "${BACKUP_CONFIG}")"
       TEXT+="\nArc Patch: ${ARC_PATCH}"
+      KERNEL="$(readConfigKey "kernel" "${BACKUP_CONFIG}")"
+      TEXT+="\nKernel: ${KERNEL}"
       CONFDONE="$(readConfigKey "arc.confdone" "${BACKUP_CONFIG}")"
       dialog --backtitle "$(backtitle)" --title "Restore Arc" \
         --aspect 18 --msgbox "${TEXT}" 0 0
@@ -3870,9 +3869,15 @@ function recoverDSM() {
       PLATFORM="$(readConfigKey "platform" "${USER_CONFIG_FILE}")"
       KVER="$(readConfigKey "platforms.${PLATFORM}.productvers.\"${PRODUCTVER}\".kver" "${P_FILE}")"
       is_in_array "${PLATFORM}" "${KVER5L[@]}" && KVERP="${PRODUCTVER}-${KVER}" || KVERP="${KVER}"
-      if [ -n "${PLATFORM}" ] && [ -n "${KVERP}" ]; then
-        writeConfigKey "modules" "{}" "${USER_CONFIG_FILE}"
-        mergeConfigModules "$(getAllModules "${PLATFORM}" "${KVERP}" | awk '{print $1}')" "${USER_CONFIG_FILE}"
+      if [ "${KERNEL}" = "custom" ]; then
+        customKernel
+      else
+        KVER="$(readConfigKey "platforms.${PLATFORM}.productvers.\"${PRODUCTVER}\".kver" "${P_FILE}")"
+        is_in_array "${PLATFORM}" "${KVER5L[@]}" && KVERP="${PRODUCTVER}-${KVER}" || KVERP="${KVER}"
+        if [ -n "${PLATFORM}" ] && [ -n "${KVERP}" ]; then
+          writeConfigKey "modules" "{}" "${USER_CONFIG_FILE}"
+          mergeConfigModules "$(getAllModules "${PLATFORM}" "${KVERP}" | awk '{print $1}')" "${USER_CONFIG_FILE}"
+        fi
       fi
     fi
     dialog --backtitle "$(backtitle)" --title "Restore Arc" \
@@ -3928,7 +3933,7 @@ function cleanDSMRoot() {
 # Custom Kernel
 function customKernel() {
   dialog --backtitle "$(backtitle)" --title "Kernel" \
-    --infobox "Switching Kernel to ${KERNEL}! Stay patient..." 3 50
+    --infobox "Configuring ${KERNEL} Kernel! Stay patient..." 3 50
   if [ "${ODP}" = "true" ]; then
     ODP="false"
     writeConfigKey "odp" "${ODP}" "${USER_CONFIG_FILE}"

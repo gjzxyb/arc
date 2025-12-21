@@ -67,7 +67,7 @@ if [ "${ARC_MODE}" = "update" ] || [ "${ARC_MODE}" = "automated" ]; then
   LOCKFILE="/tmp/arc_menu.lock"
   exec 200>"$LOCKFILE"
   flock -n 200 || {
-    echo "Another Arc instance is running in this mode."
+    echo "Another Arc instance is running in ${ARC_MODE} mode."
     exit 1
   }
 fi
@@ -136,7 +136,7 @@ elif [ "${ARC_MODE}" = "config" ]; then
           write_menu_value "g" "Scaling Governor" "${GOVERNOR:-performance}"
         fi
 
-        if [ "${PLATFORM}" = "epyc7002" ] && [[ "${PRODUCTVER}" = "7.2" || "${PRODUCTVER}" = "7.3" ]]; then
+        if [ -f "${CUSTOM_PATH}/bzImage-${PLATFORM}-${KVERP}.gz" ] && [ -f "${CUSTOM_PATH}/modules-${PLATFORM}-${KVERP}.tgz" ]; then
           write_menu_value "K" "Kernel" "${KERNEL}"
         fi
 
