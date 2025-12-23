@@ -122,7 +122,7 @@ fi
 if readConfigMap "addons" "${USER_CONFIG_FILE}" | grep -q nvmesystem; then
   [ -z "$(ls /dev/nvme* | grep -vE "${LOADER_DISK}[0-9]?$" 2>/dev/null)" ] && printf "\033[1;33m*** %s ***\033[0m\n" "Notice: Please insert at least one m.2 disk for system installation."
 else
-  if [ -z "$(ls /dev/sd* /dev/sg* | grep -vE "${LOADER_DISK}[0-9]?$" 2>/dev/null)" ]; then
+  if [ -z "$(ls /dev/sd* /dev/sg* 2>/dev/null | grep -vE "${LOADER_DISK}[0-9]?$")" ]; then
     printf "\033[1;33m*** %s ***\033[0m\n" "Notice: Please insert at least one SATA, SAS, or SCSI disk for system installation."
   fi
 fi
@@ -197,8 +197,6 @@ elif [ -n "${KVER}" ] && [ "${KVER:0:1}" -lt "5" ]; then
     CMDLINE['dom_szmax']="${SIZE}"
   fi
   CMDLINE['elevator']="elevator"
-else
-  CMDLINE['split_lock_detect']="off"
 fi
 
 if [ "${DT}" = "true" ]; then
@@ -210,6 +208,7 @@ else
   CMDLINE['syno_hdd_powerup_seq']="0"
 fi
 
+CMDLINE['split_lock_detect']="off"
 CMDLINE['HddHotplug']="1"
 CMDLINE['vender_format_version']="2"
 CMDLINE['skip_vender_mac_interfaces']="0,1,2,3,4,5,6,7"
