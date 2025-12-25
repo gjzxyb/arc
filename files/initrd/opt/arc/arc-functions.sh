@@ -3951,3 +3951,16 @@ function customKernel() {
     mergeConfigModules "$(getAllModules "${PLATFORM}" "${KVERP}" | awk '{print $1}')" "${USER_CONFIG_FILE}"
   fi
 }
+
+###############################################################################
+# Screen Timeout
+function setScreenTimeout() {
+  CONSOLEBLANK="$(readConfigKey "arc.screentimeout" "${USER_CONFIG_FILE}")"
+  dialog --backtitle "$(backtitle)" --title "Screen Timeout" \
+    --inputbox "Set screen timeout in seconds (0 = never turn off):" 8 60 "${CONSOLEBLANK:-0}" 2>"${TMP_PATH}/resp"
+  [ $? -ne 0 ] && return
+  resp="$(cat "${TMP_PATH}/resp" 2>/dev/null)"
+  [ -z "${resp}" ] && return
+  CONSOLEBLANK="${resp}"
+  writeConfigKey "arc.screentimeout" "${CONSOLEBLANK}" "${USER_CONFIG_FILE}"
+}

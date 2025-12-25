@@ -156,6 +156,7 @@ elif [ "${ARC_MODE}" = "config" ]; then
       if [ "${BOOTOPTS}" = "true" ]; then
         write_menu "6" "\Z1Hide Boot Options\Zn"
         write_menu "f" "Bootscreen Options"
+        write_menu_value "Y" "Screen Timeout" "${CONSOLEBLANK}"
         write_menu_value "m" "Boot Kernelload" "${KERNELLOAD}"
         write_menu_value "E" "eMMC Boot Support" "$( [ "${EMMCBOOT}" = "true" ] && echo "enabled" || echo "disabled" )"
         if [ "${DIRECTBOOT}" = "false" ]; then
