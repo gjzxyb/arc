@@ -227,6 +227,17 @@ if [ -d "${MODULES_PATH}/" ]; then
   done < <(find "${MODULES_PATH}" -maxdepth 1 -type f -name '*-7.2-*.tgz' -print0)
 fi
 
+if [ -d "${CUSTOM_PATH}/" ]; then
+  while IFS= read -r -d '' CSRC; do
+    CSRCB="$(basename "$CSRC")"
+    CTARB="${CSRCB/-7.2-/-7.3-}"
+    CTAR="${CUSTOM_PATH}/${CTARB}"
+    if [ "$CTAR" != "$CSRC" ] && [ ! -e "$CTAR" ]; then
+      ln -sf "$CSRC" "$CTAR" || true
+    fi
+  done < <(find "${CUSTOM_PATH}" -maxdepth 1 -type f -name '*-7.2-*.tgz' -print0)
+fi
+
 DEVELOPMENT_MODE="$(readConfigKey "arc.dev" "${USER_CONFIG_FILE}")"
 if [ "${DEVELOPMENT_MODE}" = "true" ]; then
   echo -e "\033[1;34mDevelopment Mode is enabled.\033[0m"
