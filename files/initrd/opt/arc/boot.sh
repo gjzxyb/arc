@@ -188,7 +188,8 @@ fi
 if [ -z "${KVER}" ]; then
   echo "Error: DSM ${PRODUCTVER} on ${PLATFORM} is not supported."
   exit 1
-elif [ -n "${KVER}" ] && [ "${KVER:0:1}" -lt "5" ]; then
+fi
+if [ "${KVER:0:1}" -lt "5" ]; then
   if [ "${BUS}" != "usb" ]; then
     SZ=$(blockdev --getsz "${LOADER_DISK}" 2>/dev/null) # SZ=$(cat /sys/block/${LOADER_DISK/\/dev\//}/size)
     SS=$(blockdev --getss "${LOADER_DISK}" 2>/dev/null) # SS=$(cat /sys/block/${LOADER_DISK/\/dev\//}/queue/hw_sector_size)
@@ -199,6 +200,8 @@ elif [ -n "${KVER}" ] && [ "${KVER:0:1}" -lt "5" ]; then
     CMDLINE['dom_szmax']="${SIZE}"
   fi
   CMDLINE['elevator']="elevator"
+else
+  CMDLINE['split_lock_detect']="off"
 fi
 
 if [ "${DT}" = "true" ]; then
@@ -210,7 +213,6 @@ else
   CMDLINE['syno_hdd_powerup_seq']="0"
 fi
 
-CMDLINE['split_lock_detect']="off"
 CMDLINE['HddHotplug']="1"
 CMDLINE['vender_format_version']="2"
 CMDLINE['skip_vender_mac_interfaces']="0,1,2,3,4,5,6,7"
