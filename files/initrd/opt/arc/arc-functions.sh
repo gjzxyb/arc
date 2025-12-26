@@ -87,10 +87,10 @@ function arcModel() {
           if [ "${CPUCHT:-0}" -gt "${PLTCNT:-0}" ]; then
             if [ "${M}" = "SA6400" ]; then
               PLTCNT="128"
-              echo -e "${WARN}- CPU Threads count (${CPUCHT}) exceeds platform count (${PLTCNT})\nYou need to enable the custom kernel\n" >>"${TMP_PATH}/${M}_warn"
+              echo -e "${WARN}- CPU Threads (${CPUCHT}) exceed the maximum supported threads (${PLTCNT})\nYou should enable the custom kernel\n" >>"${TMP_PATH}/${M}_warn"
             else
               COMPATIBLE=0
-              echo -e "${WARN}- CPU Threads count (${CPUCHT}) exceeds platform count (${PLTCNT})\n" >>"${TMP_PATH}/${M}_warn"
+              echo -e "${WARN}- CPU Threads (${CPUCHT}) exceed the maximum supported threads (${PLTCNT})\n" >>"${TMP_PATH}/${M}_warn"
             fi
           fi
           if [ "${M}" != "SA6400" ] && [ "${MEV}" = "hyperv" ]; then
@@ -277,22 +277,24 @@ function arcVersion() {
   dialog --backtitle "$(backtitle)" --title "Arc Config" \
     --infobox "Reconfiguring Addons, Modules and Synoinfo" 3 60
 
-  writeConfigKey "synoinfo" "{}" "${USER_CONFIG_FILE}"
-  while IFS=': ' read -r KEY VALUE; do
-    writeConfigKey "synoinfo.\"${KEY}\"" "${VALUE}" "${USER_CONFIG_FILE}"
-  done < <(readConfigMap "platforms.${PLATFORM}.synoinfo" "${P_FILE}")
-
   writeConfigKey "kernel" "official" "${USER_CONFIG_FILE}"
   if [ "${MODEL}" = "SA6400" ]; then
     PLTCNT="$(readConfigKey "platforms.${PLATFORM}.ccnt" "${P_FILE}")"
     if [ "${CPUCHT:-0}" -gt "${PLTCNT:-0}" ]; then
-      writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
+      dialog --backtitle "$(backtitle)" --title "Custom Kernel" \
+        --yesno "CPU Threads (${CPUCHT}) exceed the maximum supported threads (${PLTCNT}).\nDo you want to enable the custom kernel?" 8 70
+      [ $? -eq 0 ] && writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
     elif [ "${MEV}" = "hyperv" ]; then
-      writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
+      dialog --backtitle "$(backtitle)" --title "Custom Kernel" \
+        --yesno "Hyper-V detected. Do you want to enable the custom kernel?" 8 70
+      [ $? -eq 0 ] && writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
     elif [ "${PRODUCTVER}" = "7.3" ]; then
-      writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
+      dialog --backtitle "$(backtitle)" --title "Custom Kernel" \
+        --yesno "DSM Version is 7.3. Do you want to enable the custom kernel?" 8 70
+      [ $? -eq 0 ] && writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
     fi
   fi
+
   KERNEL="$(readConfigKey "kernel" "${USER_CONFIG_FILE}")"
   if [ "${KERNEL}" = "custom" ]; then
     customKernel
@@ -304,6 +306,11 @@ function arcVersion() {
       mergeConfigModules "$(getAllModules "${PLATFORM}" "${KVERP}" | awk '{print $1}')" "${USER_CONFIG_FILE}"
     fi
   fi
+
+  writeConfigKey "synoinfo" "{}" "${USER_CONFIG_FILE}"
+  while IFS=': ' read -r KEY VALUE; do
+    writeConfigKey "synoinfo.\"${KEY}\"" "${VALUE}" "${USER_CONFIG_FILE}"
+  done < <(readConfigMap "platforms.${PLATFORM}.synoinfo" "${P_FILE}")
 
   ADDONS="$(readConfigKey "addons" "${USER_CONFIG_FILE}")"
   if [ "${ADDONS}" = "{}" ]; then
