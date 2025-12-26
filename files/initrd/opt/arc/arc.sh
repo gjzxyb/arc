@@ -136,7 +136,7 @@ elif [ "${ARC_MODE}" = "config" ]; then
           write_menu_value "g" "Scaling Governor" "${GOVERNOR:-performance}"
         fi
 
-        if [ -f "${CUSTOM_PATH}/bzImage-${PLATFORM}-${KVERP}.gz" ] && [ -f "${CUSTOM_PATH}/modules-${PLATFORM}-${KVERP}.tgz" ]; then
+        if [ "${MODEL}" = "SA6400" ] && [[ "${PRODUCTVER}" = "7.2" || "${PRODUCTVER}" = "7.3" ]]; then
           write_menu_value "K" "Kernel" "${KERNEL}"
         fi
 
