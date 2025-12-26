@@ -10,6 +10,7 @@ LOCKFILE="/tmp/.bootlock"
 exec 200>"$LOCKFILE"
 flock -n 200 || { echo "Boot is in progress. Exiting."; exit 0; }
 
+set -e
 [[ -z "${ARC_PATH}" || ! -d "${ARC_PATH}/include" ]] && ARC_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 
 . "${ARC_PATH}/include/functions.sh"
@@ -69,7 +70,6 @@ GOVERNOR="$(readConfigKey "governor" "${USER_CONFIG_FILE}")"
 USBMOUNT="$(readConfigKey "usbmount" "${USER_CONFIG_FILE}")"
 HDDSORT="$(readConfigKey "hddsort" "${USER_CONFIG_FILE}")"
 BUILDDONE="$(readConfigKey "arc.builddone" "${USER_CONFIG_FILE}")"
-ARC_PATCH="$(readConfigKey "arc.patch" "${USER_CONFIG_FILE}")"
 
 # Build Sanity Check
 if [ "${BUILDDONE}" = "false" ]; then
@@ -267,12 +267,12 @@ fi
 # Read user network settings
 while IFS=': ' read -r KEY VALUE; do
   [ -n "${KEY}" ] && CMDLINE["network.${KEY}"]="${VALUE}"
-done < <(readConfigMap "network" "${USER_CONFIG_FILE}")
+done <<<"$(readConfigMap "network" "${USER_CONFIG_FILE}")"
 
 # Read user cmdline
 while IFS=': ' read -r KEY VALUE; do
   [ -n "${KEY}" ] && CMDLINE["${KEY}"]="${VALUE}"
-done < <(readConfigMap "cmdline" "${USER_CONFIG_FILE}")
+done <<<"$(readConfigMap "cmdline" "${USER_CONFIG_FILE}")"
 
 # Prepare command line
 CMDLINE_LINE=""

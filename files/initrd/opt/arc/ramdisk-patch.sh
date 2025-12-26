@@ -88,15 +88,15 @@ declare -A SYNOINFO
 
 while IFS=': ' read -r KEY VALUE; do
   [ -n "${KEY}" ] && ADDONS["${KEY}"]="${VALUE}"
-done < <(readConfigMap "addons" "${USER_CONFIG_FILE}")
+done <<<"$(readConfigMap "addons" "${USER_CONFIG_FILE}")"
 
 while IFS=': ' read -r KEY VALUE; do
   [ -n "${KEY}" ] && MODULES["${KEY}"]="${VALUE}"
-done < <(readConfigMap "modules" "${USER_CONFIG_FILE}")
+done <<<"$(readConfigMap "modules" "${USER_CONFIG_FILE}")"
 
 while IFS=': ' read -r KEY VALUE; do
   [ -n "${KEY}" ] && SYNOINFO["${KEY}"]="${VALUE}"
-done < <(readConfigMap "synoinfo" "${USER_CONFIG_FILE}")
+done <<<"$(readConfigMap "synoinfo" "${USER_CONFIG_FILE}")"
 
 # Patches (diff -Naru OLDFILE NEWFILE > xxx.patch)
 PATCHS=(
@@ -116,6 +116,25 @@ for PE in "${PATCHS[@]}"; do
   done
   [ ${RET} -ne 0 ] && exit 1
 done
+
+# Kernel patches
+[ "${ARC_MODE}" != "dsm" ] && echo -e ">> Ramdisk: apply Linux ${KVER:0:1}.x fixes"
+if [ "${KVER:0:1}" = "5" ]; then
+  sed -i 's#/dev/console#/var/log/lrc#g' "${RAMDISK_PATH}/usr/bin/busybox"
+  sed -i '/^echo "START/a \\nmknod -m 0666 /dev/console c 1 3' "${RAMDISK_PATH}/linuxrc.syno"
+else
+  cp -f "${PATCH_PATH}/iosched-trampoline.sh" "${RAMDISK_PATH}/usr/sbin/modprobe"
+fi
+
+# Broadwellntbap patches
+[ "${ARC_MODE}" != "dsm" ] && echo -e ">> Ramdisk: apply ${PLATFORM} fixes"
+if [ "${PLATFORM}" = "broadwellntbap" ]; then
+  sed -i 's/IsUCOrXA="yes"/XIsUCOrXA="yes"/g; s/IsUCOrXA=yes/XIsUCOrXA=yes/g' "${RAMDISK_PATH}/usr/syno/share/environments.sh"
+fi
+
+# DSM 7.3
+[ "${ARC_MODE}" != "dsm" ] && echo -e ">> Ramdisk: apply DSM ${PRODUCTVER:0:3} fixes"
+sed -i 's#/usr/syno/sbin/broadcom_update.sh#/usr/syno/sbin/broadcom_update.sh.arc#g' "${RAMDISK_PATH}/linuxrc.syno.impl"
 
 # Addons
 mkdir -p "${RAMDISK_PATH}/addons"
@@ -138,21 +157,14 @@ chmod +x "${RAMDISK_PATH}/addons/addons.sh"
 
 # System Addons
 [ "${ARC_MODE}" != "dsm" ] && echo -e ">> Ramdisk: install addons"
-SYSADDONS="revert misc eudev netfix disks localrss notify mountloader"
-if [ "${KVER:0:1}" = "5" ]; then
-  SYSADDONS="redpill ${SYSADDONS}"
-fi
 
-for ADDON in ${SYSADDONS}; do
+for ADDON in "redpill" "revert" "misc" "eudev" "netfix" "disks" "localrss" "notify" "mountloader"; do
   if [ "${ADDON}" = "disks" ]; then
     [ -f "${USER_UP_PATH}/model.dts" ] && cp -f "${USER_UP_PATH}/model.dts" "${RAMDISK_PATH}/addons/model.dts"
     [ -f "${USER_UP_PATH}/${MODEL}.dts" ] && cp -f "${USER_UP_PATH}/${MODEL}.dts" "${RAMDISK_PATH}/addons/model.dts"
   fi
-  if installAddon "${ADDON}" "${PLATFORM}" "${KVERP}"; then
-    echo "/addons/${ADDON}.sh \${1} ${PARAMS}" >>"${RAMDISK_PATH}/addons/addons.sh" 2>>"${LOG_FILE}" || exit 1
-  else
-    echo "Addon ${ADDON} not found"
-  fi
+  installAddon "${ADDON}" "${PLATFORM}" || exit 1
+  echo "/addons/${ADDON}.sh \${1} ${PARAMS}" >>"${RAMDISK_PATH}/addons/addons.sh" 2>>"${LOG_FILE}" || exit 1
 done
 
 # User Addons
@@ -166,42 +178,9 @@ for ADDON in "${!ADDONS[@]}"; do
   else
     PARAMS="${ADDONS[${ADDON}]}"
   fi
-  if installAddon "${ADDON}" "${PLATFORM}" "${KVERP}"; then
-    echo "/addons/${ADDON}.sh \${1} ${PARAMS}" >>"${RAMDISK_PATH}/addons/addons.sh" 2>>"${LOG_FILE}"
-  else
-    echo "Addon ${ADDON} not found"
-  fi
+  installAddon "${ADDON}" "${PLATFORM}" || exit 1
+  echo "/addons/${ADDON}.sh \${1} ${PARAMS}" >>"${RAMDISK_PATH}/addons/addons.sh" 2>>"${LOG_FILE}" || exit 1
 done
-
-# Fan control
-if readConfigMap "addons" "${USER_CONFIG_FILE}" | grep -q fancontrol; then
-  SYNOINFO["support_fan"]="yes"
-  SYNOINFO["support_fan_adjust_dual_mode"]="yes"
-  SYNOINFO["support_adt7490"]="yes"
-else
-  SYNOINFO["support_fan"]="no"
-  SYNOINFO["support_fan_adjust_dual_mode"]="no"
-  SYNOINFO["support_adt7490"]="no"
-fi
-
-# Patch synoinfo.conf
-echo -n "" >"${RAMDISK_PATH}/addons/synoinfo.conf"
-for KEY in "${!SYNOINFO[@]}"; do
-  echo "Set synoinfo ${KEY}" >>"${LOG_FILE}"
-  echo "${KEY}=\"${SYNOINFO[${KEY}]}\"" >>"${RAMDISK_PATH}/addons/synoinfo.conf"
-  _set_conf_kv "${RAMDISK_PATH}/etc/synoinfo.conf" "${KEY}" "${SYNOINFO[${KEY}]}" || exit 1
-  _set_conf_kv "${RAMDISK_PATH}/etc.defaults/synoinfo.conf" "${KEY}" "${SYNOINFO[${KEY}]}" || exit 1
-done
-rm -f "${RAMDISK_PATH}/usr/bin/get_key_value"
-if [ ! -x "${RAMDISK_PATH}/usr/bin/get_key_value" ]; then
-  printf '#!/bin/sh\n%s\n_get_conf_kv "$@"' "$(declare -f _get_conf_kv)" >"${RAMDISK_PATH}/usr/bin/get_key_value"
-  chmod a+x "${RAMDISK_PATH}/usr/bin/get_key_value"
-fi
-rm -f "${RAMDISK_PATH}/usr/bin/set_key_value"
-if [ ! -x "${RAMDISK_PATH}/usr/bin/set_key_value" ]; then
-  printf '#!/bin/sh\n%s\n_set_conf_kv "$@"' "$(declare -f _set_conf_kv)" >"${RAMDISK_PATH}/usr/bin/set_key_value"
-  chmod a+x "${RAMDISK_PATH}/usr/bin/set_key_value"
-fi
 
 # Extract modules to ramdisk
 [ "${ARC_MODE}" != "dsm" ] && echo -e ">> Ramdisk: install modules"
@@ -214,6 +193,25 @@ if [ -f "${USER_UP_PATH}/modulelist" ]; then
 else
   cp -f "${ARC_PATH}/include/modulelist" "${RAMDISK_PATH}/addons/modulelist"
 fi
+
+# Patch synoinfo.conf
+echo -n "" >"${RAMDISK_PATH}/addons/synoinfo.conf"
+for KEY in "${!SYNOINFO[@]}"; do
+  echo "Set synoinfo ${KEY}" >>"${LOG_FILE}"
+  echo "${KEY}=\"${SYNOINFO[${KEY}]}\"" >>"${RAMDISK_PATH}/addons/synoinfo.conf"
+  _set_conf_kv "${RAMDISK_PATH}/etc/synoinfo.conf" "${KEY}" "${SYNOINFO[${KEY}]}" || exit 1
+  _set_conf_kv "${RAMDISK_PATH}/etc.defaults/synoinfo.conf" "${KEY}" "${SYNOINFO[${KEY}]}" || exit 1
+done
+if [ ! -x "${RAMDISK_PATH}/usr/bin/get_key_value" ]; then
+  printf '#!/bin/sh\n%s\n_get_conf_kv "$@"' "$(declare -f _get_conf_kv)" >"${RAMDISK_PATH}/usr/bin/get_key_value"
+  chmod a+x "${RAMDISK_PATH}/usr/bin/get_key_value"
+fi
+if [ ! -x "${RAMDISK_PATH}/usr/bin/set_key_value" ]; then
+  printf '#!/bin/sh\n%s\n_set_conf_kv "$@"' "$(declare -f _set_conf_kv)" >"${RAMDISK_PATH}/usr/bin/set_key_value"
+  chmod a+x "${RAMDISK_PATH}/usr/bin/set_key_value"
+fi
+
+[ "${BUILDNUM}" -le 25556 ] && find "${RAMDISK_PATH}/addons/" -type f -name "*.sh" -exec sed -i 's/function //g' {} \;
 
 # backup current loader configs
 mkdir -p "${RAMDISK_PATH}/usr/arc"
@@ -242,41 +240,12 @@ for N in $(seq 0 7); do
   echo -e "DEVICE=eth${N}\nBOOTPROTO=dhcp\nONBOOT=yes\nIPV6INIT=auto_dhcp\nIPV6_ACCEPT_RA=1" >"${RAMDISK_PATH}/etc/sysconfig/network-scripts/ifcfg-eth${N}"
 done
 
-# Kernel patches
-[ "${ARC_MODE}" != "dsm" ] && echo -e ">> Ramdisk: apply Linux ${KVER:0:1}.x fixes"
-if [ "${KVER:0:1}" = "5" ]; then
-  sed -i 's#/dev/console#/var/log/lrc#g' "${RAMDISK_PATH}/usr/bin/busybox"
-  sed -i '/^echo "START/a \\nmknod -m 0666 /dev/console c 1 3' "${RAMDISK_PATH}/linuxrc.syno"
-elif [ "${KVER:0:1}" = "4" ]; then
-  cp -f "${PATCH_PATH}/iosched-trampoline.sh" "${RAMDISK_PATH}/usr/sbin/modprobe"
-fi
-
-# Broadwellntbap patches
-[ "${ARC_MODE}" != "dsm" ] && echo -e ">> Ramdisk: apply ${PLATFORM} fixes"
-if [ "${PLATFORM}" = "broadwellntbap" ]; then
-  sed -i 's/IsUCOrXA="yes"/XIsUCOrXA="yes"/g; s/IsUCOrXA=yes/XIsUCOrXA=yes/g' "${RAMDISK_PATH}/usr/syno/share/environments.sh"
-fi
-
-# DSM 7.3
-[ "${ARC_MODE}" != "dsm" ] && echo -e ">> Ramdisk: apply DSM ${PRODUCTVER:0:3} fixes"
-if [ "${PRODUCTVER:0:3}" = "7.3" ]; then
-  sed -i 's#/usr/syno/sbin/broadcom_update.sh#/usr/syno/sbin/broadcom_update.sh.arc#g' "${RAMDISK_PATH}/linuxrc.syno.impl"
-fi
-
-# Call user patch scripts
-for F in ${SCRIPTS_PATH}/*.sh; do
-  [ ! -e "${F}" ] && continue
-  echo "Calling ${F}" >"${LOG_FILE}"
-  # shellcheck source=/dev/null
-  . "${F}" >>"${LOG_FILE}" 2>&1 || exit 1
-done
-
 # Reassembly ramdisk
 rm -f "${MOD_RDGZ_FILE}"
 if [ "${RD_COMPRESSED}" = "true" ]; then
-  (cd "${RAMDISK_PATH}" && find . 2>/dev/null | cpio -o -H newc -R root:root | xz -9 --format=lzma >"${MOD_RDGZ_FILE}") >>"${LOG_FILE}" 2>&1 || exit 1
+  (cd "${RAMDISK_PATH}" && find . 2>/dev/null | cpio -o -H newc -R root:root | xz -9 --format=lzma >"${MOD_RDGZ_FILE}") >"${LOG_FILE}" 2>&1 || exit 1
 else
-  (cd "${RAMDISK_PATH}" && find . 2>/dev/null | cpio -o -H newc -R root:root >"${MOD_RDGZ_FILE}") >>"${LOG_FILE}" 2>&1 || exit 1
+  (cd "${RAMDISK_PATH}" && find . 2>/dev/null | cpio -o -H newc -R root:root >"${MOD_RDGZ_FILE}") >"${LOG_FILE}" 2>&1 || exit 1
 fi
 
 sync
