@@ -281,7 +281,7 @@ for KEY in "${!CMDLINE[@]}"; do
   CMDLINE_LINE+=" ${KEY}"
   [ -n "${VALUE}" ] && CMDLINE_LINE+="=${VALUE}"
 done
-CMDLINE_LINE="$(echo "${CMDLINE_LINE}" | sed 's/^ //')"
+CMDLINE_LINE=$(echo ${CMDLINE_LINE} | sed 's/>/\\\\>/g')
 echo "${CMDLINE_LINE}" >"${PART1_PATH}/cmdline.yml"
 
 # Boot
