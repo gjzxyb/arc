@@ -174,14 +174,14 @@ for ADDON in "${!ADDONS[@]}"; do
 done
 
 # Fan control
-if [[ -z "${ADDONS[fancontrol]}" ]]; then
-  SYNOINFO["support_fan"]="no"
-  SYNOINFO["support_fan_adjust_dual_mode"]="no"
-  SYNOINFO["support_adt7490"]="no"
-else
+if readConfigMap "addons" "${USER_CONFIG_FILE}" | grep -q fancontrol; then
   SYNOINFO["support_fan"]="yes"
   SYNOINFO["support_fan_adjust_dual_mode"]="yes"
   SYNOINFO["support_adt7490"]="yes"
+else
+  SYNOINFO["support_fan"]="no"
+  SYNOINFO["support_fan_adjust_dual_mode"]="no"
+  SYNOINFO["support_adt7490"]="no"
 fi
 
 # Patch synoinfo.conf
