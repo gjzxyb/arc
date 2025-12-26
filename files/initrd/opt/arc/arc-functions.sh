@@ -627,6 +627,7 @@ function juniorboot() {
     dialog --backtitle "$(backtitle)" --title "Arc Boot" \
       --infobox "Booting DSM Reinstall Mode...\nPlease stay patient!" 4 30
     sleep 3
+    sync
     rebootTo junior
   fi
   return
@@ -648,6 +649,7 @@ function bootcheck() {
       --infobox "Booting DSM...\nPlease stay patient!" 4 25
     sleep 2
     clear
+    sync
     exec boot.sh
   fi
   return

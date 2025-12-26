@@ -48,8 +48,8 @@ RAMDISK_HASH_CUR="$(sha256sum "${ORI_RDGZ_FILE}" | awk '{print $1}')"
 if [ "${ZIMAGE_HASH_CUR}" != "${ZIMAGE_HASH}" ] || [ "${RAMDISK_HASH_CUR}" != "${RAMDISK_HASH}" ]; then
   echo -e "\033[1;31mDSM zImage/Ramdisk changed!\033[0m"
   livepatch
-  echo
 fi
+echo
 
 # Read model/system variables
 PLATFORM="$(readConfigKey "platform" "${USER_CONFIG_FILE}")"
@@ -82,7 +82,6 @@ if [ "${BUILDDONE}" = "false" ]; then
 fi
 
 # Show Loader Info
-echo
 DSMINFO="$(readConfigKey "bootscreen.dsminfo" "${USER_CONFIG_FILE}")"
 SYSTEMINFO="$(readConfigKey "bootscreen.systeminfo" "${USER_CONFIG_FILE}")"
 DISKINFO="$(readConfigKey "bootscreen.diskinfo" "${USER_CONFIG_FILE}")"
@@ -337,8 +336,8 @@ else
   # umount -fa 2>/dev/null
   # sh -c 'echo 3 >/proc/sys/vm/drop_caches'
 
-  sync
-  sleep 3
+  # sync
+  # sleep 3
 
   KERNELLOAD="$(readConfigKey "kernelload" "${USER_CONFIG_FILE}")"
   [ -z "${KERNELLOAD}" ] && KERNELLOAD="kexec"
