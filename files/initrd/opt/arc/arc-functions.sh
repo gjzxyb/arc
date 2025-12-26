@@ -86,7 +86,6 @@ function arcModel() {
           [ -z "$(grep -w "${A}" "${P_FILE}")" ] && COMPATIBLE=0
           if [ "${CPUCHT:-0}" -gt "${PLTCNT:-0}" ]; then
             if [ "${M}" = "SA6400" ]; then
-              PLTCNT="128"
               echo -e "${WARN}- CPU Threads (${CPUCHT}) exceed the maximum supported threads (${PLTCNT})\nYou should enable the custom kernel\n" >>"${TMP_PATH}/${M}_warn"
             else
               COMPATIBLE=0
@@ -282,15 +281,15 @@ function arcVersion() {
     PLTCNT="$(readConfigKey "platforms.${PLATFORM}.ccnt" "${P_FILE}")"
     if [ "${CPUCHT:-0}" -gt "${PLTCNT:-0}" ]; then
       dialog --backtitle "$(backtitle)" --title "Custom Kernel" \
-        --yesno "CPU Threads (${CPUCHT}) exceed the maximum supported threads (${PLTCNT}).\nDo you want to enable the custom kernel?" 8 70
+        --yesno "CPU Threads (${CPUCHT}) exceed the maximum supported threads (${PLTCNT}).\nDo you want to enable the custom kernel?" 6 65
       [ $? -eq 0 ] && writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
     elif [ "${MEV}" = "hyperv" ]; then
       dialog --backtitle "$(backtitle)" --title "Custom Kernel" \
-        --yesno "Hyper-V detected. Do you want to enable the custom kernel?" 8 70
+        --yesno "Hyper-V detected. Do you want to enable the custom kernel?" 6 65
       [ $? -eq 0 ] && writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
     elif [ "${PRODUCTVER}" = "7.3" ]; then
       dialog --backtitle "$(backtitle)" --title "Custom Kernel" \
-        --yesno "DSM Version is 7.3. Do you want to enable the custom kernel?" 8 70
+        --yesno "DSM 7.3 selected. Do you want to enable the custom kernel?" 6 65
       [ $? -eq 0 ] && writeConfigKey "kernel" "custom" "${USER_CONFIG_FILE}"
     fi
   fi
