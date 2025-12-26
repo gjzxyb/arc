@@ -117,6 +117,7 @@ fi
 
 # Read/Write IP/Mac to config
 ETHX="$(find /sys/class/net/ -mindepth 1 -maxdepth 1 -name 'eth*' -exec basename {} \; | sort)"
+ETHN=0
 for N in ${ETHX}; do
   MACR="$(cat /sys/class/net/${N}/address 2>/dev/null | sed 's/://g' | tr '[:upper:]' '[:lower:]')"
   IPR="$(readConfigKey "network.${MACR}" "${USER_CONFIG_FILE}")"
@@ -138,9 +139,8 @@ for N in ${ETHX}; do
   fi
   [ "${N:0:3}" = "eth" ] && ethtool -s "${N}" wol g 2>/dev/null || true
   initConfigKey "${N}" "${MACR}" "${USER_CONFIG_FILE}"
+  ETHN=$((ETHN + 1))
 done
-ETHN=$(echo ${ETHX} | wc -w)
-writeConfigKey "device.nic" "${ETHN}" "${USER_CONFIG_FILE}"
 # No network devices
 echo
 [ "${ETHN}" = "0" ] && die "No NIC found! - Loader does not work without Network connection."
