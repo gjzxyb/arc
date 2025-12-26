@@ -338,6 +338,7 @@ function rebootTo() {
   [ "${1}" = "automated" ] && echo "arc-${MODEL}-${PRODUCTVER}-${ARC_VERSION}" >"${PART3_PATH}/automated"
   [ ! -f "${USER_GRUBENVFILE}" ] && grub-editenv "${USER_GRUBENVFILE}" create
   grub-editenv "${USER_GRUBENVFILE}" set next_entry="${1}"
+  sync
   exec reboot
 }
 
